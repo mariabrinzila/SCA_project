@@ -18,6 +18,7 @@ import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.OwnerPIN;
 
+
 public class Wallet extends Applet {
 
     /* constants declaration */
@@ -51,6 +52,7 @@ public class Wallet extends Applet {
     // maximum number of incorrect tries before the
     // PIN is blocked
     final static byte PIN_TRY_LIMIT = (byte) 0x03;
+    
     // maximum size PIN
     final static byte MAX_PIN_SIZE = (byte) 0x08;
 
@@ -80,7 +82,6 @@ public class Wallet extends Applet {
 
     
     private Wallet(byte[] bArray, short bOffset, byte bLength) {
-
         // It is good programming practice to allocate
         // all the memory that an applet needs during
         // its lifetime inside the constructor
@@ -108,7 +109,6 @@ public class Wallet extends Applet {
     
     @Override
     public boolean select() {
-
         // The applet declines to be selected
         // if the pin is blocked.
         if (pin.getTriesRemaining() == 0) {
@@ -116,22 +116,18 @@ public class Wallet extends Applet {
         }
 
         return true;
-
     }// end of select method
 
     
     @Override
     public void deselect() {
-
         // reset the pin value
         pin.reset();
-
     }
 
     
     @Override
     public void process(APDU apdu) {
-
         // APDU object carries a byte array (buffer) to
         // transfer incoming and outgoing APDU header
         // and data bytes between card and CAD
@@ -142,10 +138,9 @@ public class Wallet extends Applet {
         // The interface javacard.framework.ISO7816
         // declares constants to denote the offset of
         // these bytes in the APDU buffer
-
         byte[] buffer = apdu.getBuffer();
+        
         // check SELECT APDU command
-
         if (apdu.isISOInterindustryCLA()) {
             if (buffer[ISO7816.OFFSET_INS] == (byte) (0xA4)) {
                 return;
@@ -176,12 +171,10 @@ public class Wallet extends Applet {
             default:
                 ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
         }
-
     } // end of process method
 
     
     private void credit(APDU apdu) {
-
         // access authentication
         if (!pin.isValidated()) {
             ISOException.throwIt(SW_PIN_VERIFICATION_REQUIRED);
@@ -199,10 +192,11 @@ public class Wallet extends Applet {
         // bytes.
         byte byteRead = (byte) (apdu.setIncomingAndReceive());
         
-        // p1 and p2
+        // p1 and p2, p1 for money and p2 for liters
         byte p1 =(buffer[ISO7816.OFFSET_P1]);
         byte p2 =(buffer[ISO7816.OFFSET_P2]);
         
+        // credit just money <=> p1 = money, p2 = 0x00
         if ((p1 == money) && (p2 == 0x00)) {
         	// it is an error if the number of data bytes
             // read does not match the number in Lc byte
@@ -210,23 +204,24 @@ public class Wallet extends Applet {
                 ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
             }
 
-            // get the credit amount
+            // get the credit amount (RON)
             byte creditAmount = buffer[ISO7816.OFFSET_CDATA];
 
-            // check the credit amount
+            // check the credit amount (RON)
             if ((creditAmount > MAX_TRANSACTION_AMOUNT) || (creditAmount < 0)) {
                 ISOException.throwIt(SW_INVALID_TRANSACTION_AMOUNT);
             }
 
-            // check the new balance
+            // check the new balance (RON)
             if ((short) (balance + creditAmount) > MAX_BALANCE) {
                 ISOException.throwIt(SW_EXCEED_MAXIMUM_BALANCE);
             }
 
-            // credit the amount
+            // credit the amount (RON)
             balance = (short) (balance + creditAmount);
         }
         
+        // credit just liters <=> p1 = 0x00, p2 = liters
         if ((p1 == 0x00) && (p2 == liters)) {
         	// it is an error if the number of data bytes
             // read does not match the number in Lc byte
@@ -234,56 +229,64 @@ public class Wallet extends Applet {
                 ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
             }
 
-            // get the credit amount
+            // get the credit amount (liters)
             byte creditAmount = buffer[ISO7816.OFFSET_CDATA];
 
-            // check the credit amount
+            // check the credit amount (liters)
+            // maximum transaction amount is the same as for money
             if ((creditAmount > MAX_TRANSACTION_AMOUNT) || (creditAmount < 0)) {
                 ISOException.throwIt(SW_INVALID_TRANSACTION_AMOUNT);
             }
 
-            // check the new balance
+            // check the new balance (liters)
             if ((short) (balance_liters + creditAmount) > MAX_BALANCE_LITERS) {
                 ISOException.throwIt(SW_EXCEED_MAXIMUM_BALANCE);
             }
 
-            // credit the amount
+            // credit the amount (liters)
             balance_liters = (short) (balance_liters + creditAmount);
         }
         
+        // credit both money and liters <=> p1 = money, p2 = liters
         if ((p1 == money) && (p2 == liters)) {
         	// it is an error if the number of data bytes
             // read does not match the number in Lc byte
+        	// credit both money and liters <=> 2 bytes
             if ((numBytes != 2) || (byteRead != 2)) {
                 ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
             }
 
-            // get the credit amount
+            // get the credit amount (RON)
             byte creditAmount = buffer[ISO7816.OFFSET_CDATA];
+            
+            // get the credit amount (liters)
             byte litersAmount = buffer[ISO7816.OFFSET_CDATA + 1];
 
-            // check the credit amount
+            // check the credit amount (RON)
             if ((creditAmount > MAX_TRANSACTION_AMOUNT) || (creditAmount < 0)) {
                 ISOException.throwIt(SW_INVALID_TRANSACTION_AMOUNT);
             }
             
-            // check the credit amount
+            // check the credit amount (liters)
+            // maximum transaction amount is the same as for money
             if ((litersAmount > MAX_TRANSACTION_AMOUNT) || (litersAmount < 0)) {
                 ISOException.throwIt(SW_INVALID_TRANSACTION_AMOUNT);
             }
 
-            // check the new balance
+            // check the new balance (RON)
             if ((short) (balance + creditAmount) > MAX_BALANCE) {
                 ISOException.throwIt(SW_EXCEED_MAXIMUM_BALANCE);
             }
             
-            // check the new balance
+            // check the new balance (liters)
             if ((short) (balance_liters + litersAmount) > MAX_BALANCE_LITERS) {
                 ISOException.throwIt(SW_EXCEED_MAXIMUM_BALANCE);
             }
 
-            // credit the amount
+            // credit the amount (liters)
             balance_liters = (short) (balance_liters + litersAmount);
+            
+            // credit the amount (RON)
             balance = (short) (balance + creditAmount);
         }
     } // end of deposit method
@@ -308,29 +311,37 @@ public class Wallet extends Applet {
         // get debit amount (liters)
         byte debitAmount = buffer[ISO7816.OFFSET_CDATA];
 
-        // check debit amount
+        // check debit amount, MAX_TRANSACTION_AMOUNT_LITERS = 50L
         if ((debitAmount > MAX_TRANSACTION_AMOUNT_LITERS) || (debitAmount < 0)) {
             ISOException.throwIt(SW_INVALID_TRANSACTION_AMOUNT);
         }
         
-        // debitAmount > balance_liters
+        // debitAmount > balance_liters <=> take all the liters we can, convert the rest to 
+        // money and take it (if we can)
+        // spent_money = 100 <=> spent_money = 0, balance_liters += 1
         if ((short) debitAmount > (short) balance_liters) {
         	// 1L = 8 RON <=> xL = 8 * x RON
         	short ronAmount = (short)(debitAmount - balance_liters);
         	ronAmount = (short) (ronAmount * 8);
-        	//short ronAmount = (short) ((debitAmount - balance_liters) * 8);
         	
-        	// check the new balance
+        	// check the new balance (RON)
             if ((short) (balance - ronAmount) < (short) 0) {
                 ISOException.throwIt(SW_NEGATIVE_BALANCE);
             }
             
+            // update the RON balance
             balance = (short) (balance - ronAmount);
+            
+            // update the spent money
             spent_money = (short) (ronAmount + spent_money);
+            
+            // for every 100 RON spent, we get 1L 
             balance_liters = (short) (spent_money / 100);
             spent_money = (short) (spent_money % 100);
         }
         else {
+        	// we have enough in balance_liters to debit
+        	// update the liters balance
             balance_liters = (short) (balance_liters - debitAmount);
         }
     } // end of debit method
@@ -350,10 +361,11 @@ public class Wallet extends Applet {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
         
-        // p1 and p2
+        // p1 and p2, p1 for money and p2 for liters
         byte p1 =(buffer[ISO7816.OFFSET_P1]);
         byte p2 =(buffer[ISO7816.OFFSET_P2]);
         
+        // get the RON balance <=> p1 = money, p2 = 0x00
         if ((p1 == money) && (p2 == 0x00)) {
         	// informs the CAD the actual number of bytes
             // returned
@@ -369,24 +381,28 @@ public class Wallet extends Applet {
             apdu.sendBytes((short) 0, (short) 2);
         }
         
+        // get the liters balance <=> p1 = 0x00, p2 = liters
         if ((p1 == 0x00) && (p2 == liters)) {
         	// informs the CAD the actual number of bytes
             // returned
             apdu.setOutgoingLength((byte) 2);
             
-        	// move the balance data into the APDU buffer
+        	// move the balance_liters data into the APDU buffer
             // starting at the offset 0
             buffer[0] = (byte) (balance_liters >> 8);
             buffer[1] = (byte) (balance_liters & 0xFF);
 
-            // send the 2-byte balance at the offset
+            // send the 2-byte balance_liters at the offset
             // 0 in the apdu buffer
             apdu.sendBytes((short) 0, (short) 2);
         }
         
+        // get both the RON and liters balance
+        // p1 = money, p2 = liters
         if ((p1 == money) && (p2 == liters)) {
         	// informs the CAD the actual number of bytes
             // returned
+        	// 4 <=> both for RON and liters
             apdu.setOutgoingLength((byte) 4);
             
         	// move the balance data into the APDU buffer
@@ -394,10 +410,12 @@ public class Wallet extends Applet {
             buffer[0] = (byte) (balance >> 8);
             buffer[1] = (byte) (balance & 0xFF);
             
+            // move the balance_liters data into the APDU buffer
+            // starting at the offset 2
             buffer[2] = (byte) (balance_liters >> 8);
             buffer[3] = (byte) (balance_liters & 0xFF);
 
-            // send the 2-byte balance at the offset
+            // send the 4-byte joint balance at the offset
             // 0 in the apdu buffer
             apdu.sendBytes((short) 0, (short) 4);
         }
@@ -405,7 +423,6 @@ public class Wallet extends Applet {
 
     
     private void verify(APDU apdu) {
-
         byte[] buffer = apdu.getBuffer();
         // retrieve the PIN data for validation.
         byte byteRead = (byte) (apdu.setIncomingAndReceive());
@@ -417,6 +434,5 @@ public class Wallet extends Applet {
         if (pin.check(buffer, ISO7816.OFFSET_CDATA, byteRead) == false) {
             ISOException.throwIt(SW_VERIFICATION_FAILED);
         }
-
     } // end of validate method
 } // end of class Wallet
