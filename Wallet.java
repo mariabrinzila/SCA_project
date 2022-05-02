@@ -37,7 +37,7 @@ public class Wallet extends Applet {
     // maximum balance in liters <=> 500
     final static short MAX_BALANCE_LITERS = 0x1F4;
     
-    // maximum transaction amount(credit) <=> 250
+    // maximum transaction amount (credit) <=> 250
     final static short MAX_TRANSACTION_AMOUNT = 0xFA;
     
     // maximum transaction amount(debit) <=> 50
@@ -73,8 +73,10 @@ public class Wallet extends Applet {
 
     /* instance variables declaration */
     OwnerPIN pin;
+    
     short balance;
     short balance_liters;
+    short spent_money;
 
     
     private Wallet(byte[] bArray, short bOffset, byte bLength) {
@@ -323,8 +325,10 @@ public class Wallet extends Applet {
                 ISOException.throwIt(SW_NEGATIVE_BALANCE);
             }
             
-            balance_liters = (short) 0;
             balance = (short) (balance - ronAmount);
+            spent_money = (short) (ronAmount + spent_money);
+            balance_liters = (short) (spent_money / 100);
+            spent_money = (short) (spent_money % 100);
         }
         else {
             balance_liters = (short) (balance_liters - debitAmount);
@@ -345,16 +349,16 @@ public class Wallet extends Applet {
         if (le < 2) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
-
-        // informs the CAD the actual number of bytes
-        // returned
-        apdu.setOutgoingLength((byte) 2);
         
         // p1 and p2
         byte p1 =(buffer[ISO7816.OFFSET_P1]);
         byte p2 =(buffer[ISO7816.OFFSET_P2]);
         
         if ((p1 == money) && (p2 == 0x00)) {
+        	// informs the CAD the actual number of bytes
+            // returned
+            apdu.setOutgoingLength((byte) 2);
+            
         	// move the balance data into the APDU buffer
             // starting at the offset 0
             buffer[0] = (byte) (balance >> 8);
@@ -366,6 +370,10 @@ public class Wallet extends Applet {
         }
         
         if ((p1 == 0x00) && (p2 == liters)) {
+        	// informs the CAD the actual number of bytes
+            // returned
+            apdu.setOutgoingLength((byte) 2);
+            
         	// move the balance data into the APDU buffer
             // starting at the offset 0
             buffer[0] = (byte) (balance_liters >> 8);
@@ -377,6 +385,10 @@ public class Wallet extends Applet {
         }
         
         if ((p1 == money) && (p2 == liters)) {
+        	// informs the CAD the actual number of bytes
+            // returned
+            apdu.setOutgoingLength((byte) 4);
+            
         	// move the balance data into the APDU buffer
             // starting at the offset 0
             buffer[0] = (byte) (balance >> 8);
